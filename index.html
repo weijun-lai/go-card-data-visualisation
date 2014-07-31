@@ -180,7 +180,7 @@
     var map;
     var lineSymbol;
     var MotionSpeed = 20;
-    var addNewSpeed = 500;
+    var addNewSpeed = 1000;
 
 
 
@@ -188,7 +188,6 @@
 		if (error) {
 			console.log(error);
 		} else {
-			// console.log(data);
 			timer_run();
 			dataset = data;
 			load_data(0);
@@ -208,12 +207,13 @@
 	}
 
 	function isMotionToggle(e) {
-		
+		isMotionPause ^= 1;
+		// isMotionPause == true ? isMotionPause = false:isMotionPause = true;
+
 		e.value == "Motion Disable" ? e.value = "Motion Enable":e.value = "Motion Disable";
 
 		e.value == "Motion Disable" ? motionButton.attr("class","btn btn-warning btn-xs"):motionButton.attr("class","btn btn-success btn-xs");
 		
-		isMotionPause == true ? isMotionPause = false:isMotionPause = true;
         
 	}
 
@@ -223,7 +223,6 @@
 		console.clear();
 		$("p").remove(".data-set");
 		statusText.text("Clear... Done!");
-		logPathText.text("Path Debug:");
 		recordDateText.text(function(d) {return dataset[0].Operations_Date+" "+dataset[0].Boarding_Time});
 		for (var i = 0; i < lines.length; i++) {
 			lines[i].setMap(null);
@@ -258,9 +257,6 @@
 
 	}
 
-    function setAddSpeed(s) {
-    	addNewSpeed = s;
-    }
 
     function setIndex() {
     	count = parseInt($('#indexTextId').val());
@@ -402,7 +398,6 @@
 	           line.set('icons', icons);
 
         	} catch(err) {
-        		logPathText.text("error!!");
         		clearInterval(animateId);
         		return;
         	}
@@ -427,7 +422,7 @@
 
 		
 
-		// only load loacl caches.
+		// only load loacl caches this time.
 
 	    return;
 	    
