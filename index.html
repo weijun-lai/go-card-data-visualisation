@@ -1,0 +1,517 @@
+<!doctype html>
+<html>
+<head>
+	<title>Project: Evaluating public transport route usage using go card data: the case UQ St Lucia campus</title>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+	<!-- Latest compiled and minified CSS -->
+	<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+	<!-- Optional theme -->
+	<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap-theme.min.css">
+	<!-- Latest compiled and minified JavaScript -->
+	<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+	<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.2.0/js/bootstrap.min.js"></script>
+	<SCRIPT src="http://d3js.org/d3.v3.min.js"></SCRIPT>
+	<script src="https://maps.googleapis.com/maps/api/js?v=3.exp&sensor=false"></script>
+</head>
+<body>
+	<script>
+		var width = 800;
+		var height = 15;
+		var title = "Evaluating public transport route usage using go card data: the case UQ St Lucia campus";
+
+		var nav = d3.select("body")
+			.append("nav")
+			.attr("class","navbar navbar-default navbar-fixed-top")
+			.style("color","#fff")
+			.style("background","#49075e url('./images/bg.gif') repeat-x scroll 0 0")
+			.style("border","0px solid #fff")
+			.style("box-shadow","0px 3px 5px #888")
+			.attr("role","navigation");
+
+		var containers = d3.select("body")
+			.append("div").attr("class","container")
+			.style("padding-top","10%");
+		
+		var titles = nav
+			.append("div")
+			.style("margin","auto auto")
+				.append("h4")
+				.attr("class","navbar-header")
+				.text("Project: " + title);
+
+		var pTemp = titles
+			.append("p")
+
+		var startButton = titles
+			.append("input")
+			.attr("type","button")
+			.attr("value","Start")
+			.attr("class","btn  btn-danger btn-xs")
+			.attr("id","StartBtnId");
+
+		var motionButton = titles
+			.append("input")
+			.attr("class","btn btn-success btn-xs")
+			.attr("type","button")
+			.attr("value","Motion Enable")
+			.attr("id","motionBtnId")
+			.attr("onclick","isMotionToggle(this)");
+
+		var isDeleteButton = titles
+			.append("input")
+			.attr("class","btn btn-success  btn-xs")
+			.attr("type","button")
+			.attr("value","Delete Enable")
+			.attr("id","isDeleteBtnId")
+			.attr("onclick","isDeleteToggle(this)");
+
+
+		var testButton = titles
+			.append("input")
+			.attr("type","button")
+			.attr("value","console.log(data)")
+			.attr("class","btn btn-primary btn-xs")
+			.attr("onclick","print_data(false)");
+
+		var testButton2 = titles
+			.append("input")
+			.attr("type","button")
+			.attr("value","print data")
+			.attr("class","btn btn-primary btn-xs")
+			.attr("onclick","print_data(true)");
+
+		var testButton3 = titles
+			.append("input")
+			.attr("type","button")
+			.attr("value","clear")
+			.attr("class","btn btn-primary btn-xs")
+			.attr("onclick","print_clear()");
+
+		var testButton3 = titles
+			.append("input")
+			.attr("type","button")
+			.attr("value","restore")
+			.attr("class","btn btn-primary btn-xs")
+			.attr("onclick","restore_data()");
+
+		var indexTextBox = containers
+			.append("input")
+			.attr("id","indexTextId")
+			.attr("type","text")
+			.attr("value","0")
+			.style("width","5em")
+			.style("height","1.5em");
+
+		var setIndexButton = containers
+			.append("input")
+			.attr("type","button")
+			.attr("value","set Index")
+			.attr("class","btn btn-primary btn-xs")
+			.attr("onclick","setIndex()");
+
+		var showIndexButton = containers
+			.append("input")
+			.attr("type","button")
+			.attr("value","show Index")
+			.attr("class","btn btn-primary btn-xs")
+			.attr("onclick","showIndex()");
+
+		var recordDateText = containers
+			.append("span")
+			.attr("class","label label-info")
+			.attr("id","recordDateTextId")
+			.style("font-size","12px")
+			.text("00:00:00");
+
+		var timerText = containers
+			.append("span")
+			.attr("class","label label-info")
+			.attr("id","timerTextId")
+			.style("font-size","12px")
+			.text("00:00:00");
+
+		var statusText = containers
+				.append("span")
+				.attr("class","label label-danger")
+				.attr("id","statusTextId")
+				.style("font-size","12px")
+				.text("Loading data ...");
+
+
+		d3.selectAll("input")
+			.style("margin-bottom","4px");
+
+
+		var mapCanvas = containers
+			.append("div")
+			.style("width","100%")
+			.style("height","500px")
+			.attr("id","map-canvas");
+
+		var canvas = containers
+			.append("div")
+			.attr("class","data-div");
+
+		var logServerText = containers
+				.append("span")
+				.attr("class","label label-success")
+				.attr("id","logTextId")
+				.style("font-size","12px")
+				.text("Google Map Server response: OK");
+
+
+
+		/*==================csv=======================*/
+
+	//load csv data...
+
+	var dataset;
+	var timerId;
+	var count = 0;
+	var isPause = true;
+	var isMotionPause = false;
+	var isDataLoaded = false;
+	var isDeleteable = true;
+
+	var lines = [];
+    var polyline;
+    var directionsDisplay;
+    var directionsService = new google.maps.DirectionsService();
+    var map;
+    var lineSymbol;
+    var MotionSpeed = 20;
+    var addNewSpeed = 500;
+
+
+
+	d3.csv("./data/data201303mini.csv", function(error, data) {
+		if (error) {
+			console.log(error);
+		} else {
+			// console.log(data);
+			timer_run();
+			dataset = data;
+			load_data(0);
+		}
+
+		statusText.text("Data loaded ... Done! ");
+
+		recordDateText.text(function(d) {return dataset[0].Operations_Date+" "+dataset[0].Boarding_Time});
+
+		isDataLoaded = true;
+	});
+
+	function isDeleteToggle(e) {
+		isDeleteable ^= 1;
+		e.value == "Delete Enable" ? e.value = "Delete Disable":e.value = "Delete Enable";
+		e.value == "Delete Disable" ? isDeleteButton.attr("class","btn btn-warning btn-xs"):isDeleteButton.attr("class","btn btn-success btn-xs");
+	}
+
+	function isMotionToggle(e) {
+		
+		e.value == "Motion Disable" ? e.value = "Motion Enable":e.value = "Motion Disable";
+
+		e.value == "Motion Disable" ? motionButton.attr("class","btn btn-warning btn-xs"):motionButton.attr("class","btn btn-success btn-xs");
+		
+		isMotionPause == true ? isMotionPause = false:isMotionPause = true;
+        
+	}
+
+
+	function print_clear() {
+		count = 0;
+		console.clear();
+		$("p").remove(".data-set");
+		statusText.text("Clear... Done!");
+		logPathText.text("Path Debug:");
+		recordDateText.text(function(d) {return dataset[0].Operations_Date+" "+dataset[0].Boarding_Time});
+		for (var i = 0; i < lines.length; i++) {
+			lines[i].setMap(null);
+			lines[i].get('icons')[0].offset = "0%";
+		};
+	}
+
+	function restore_data() {
+		for (var i = 0; i < lines.length; i++) {
+			lines[i].setMap(map);
+			lines[i].get('icons')[0].offset = "0%";
+		};
+	}
+
+
+	function print_data(d) {
+		statusText.text("printing data ... ");
+
+		if (d) {
+
+		d3.select(".data-div").selectAll("p")
+		.data(dataset)
+		.enter()
+			.append("p")
+			.attr("class","data-set")
+			.text(function(d,i){return i + " ["+d.Route+"] ["+d.Operations_Date+" ("+d.Boarding_Time+")] (" +d.B_lat + ", " + d.B_long + ") -> "+ "("+d.A_lat+", "+d.A_long+")";});
+		} else {
+			console.log(dataset);
+		}
+
+		statusText.text("Data printed  ... done! ");
+
+	}
+
+    function setAddSpeed(s) {
+    	addNewSpeed = s;
+    }
+
+    function setIndex() {
+    	count = parseInt($('#indexTextId').val());
+    }
+
+    function showIndex() {
+    	var count = parseInt($('#indexTextId').val());
+    	lines[count].setMap(map);
+		animateCircle(lines[count]);
+    }
+
+    function timer_run() {
+    	var ms = 0;
+    	var sec = 0;
+    	var min = 0;
+    	var hrs = 0;
+    	var timerId = window.setInterval(function() {
+    		// if (isDataLoaded) {clearInterval(timerId);return;}
+    		ms = (ms + 100) ;
+    		sec = parseInt(ms/1000);
+    		// sec = (sec + 1);
+    		min = parseInt(sec/60);
+    		hrs = parseInt(min/60); 
+    		// timerText.text((hrs%24)+":"+(min%60)+":"+(sec%60)+"."+(ms%1000));
+    		timerText.text((hrs%24)+":"+(min%60)+":"+(sec%60));
+
+    	},100);
+    }
+
+
+	function initialize() {
+        directionsDisplay = new google.maps.DirectionsRenderer();
+        var mapOptions = {
+            center: new google.maps.LatLng(-27.497974,153.011139),
+            zoom: 11,
+            //mapTypeId: google.maps.MapTypeId.TERRAIN
+        };
+        
+        map = new google.maps.Map(document.getElementById('map-canvas'),
+          mapOptions);
+        directionsDisplay.setMap(map);
+
+
+        lineSymbol = {
+                 path: google.maps.SymbolPath.CIRCLE,
+                 // path: 'M -2,-2 2,2 M 2,-2 -2,2',
+                 scale: 5,
+                 strokeColor: '#71BF5B'
+             };
+
+
+         google.maps.event.addDomListener(StartBtnId, 'click', function () {
+
+         	this.value == "Pause" ? this.value = "Start":this.value = "Pause";
+
+         	isPause == true ? isPause = false:isPause = true;
+         	
+	         if (isDataLoaded && count < (dataset.length - 1) && !isPause) {
+		        run_app();
+			}
+
+	     });
+    }
+
+
+    function run_app() {
+
+    	var boardingTime = dataset[count].Operations_Date+" "+dataset[count].Boarding_Time;
+
+		recordDateText.html(boardingTime +" [ "+count+" / "+dataset.length+" ]");
+
+		statusText.text("Loading ... data index: "+count);
+
+		$('#indexTextId').val(count)
+
+		if (isPause == true) {
+			return;
+		};
+
+		calcRoute(
+     	new google.maps.LatLng(dataset[count].B_lat,dataset[count].B_long),
+     	new google.maps.LatLng(dataset[count].A_lat,dataset[count].A_long)
+     	);
+		
+		setTimeout("run_app();",addNewSpeed);
+    }
+
+
+    
+    function load_data(counter) {
+
+		    //local cache file ...
+		    var filePath = "./data/";
+		    var fileName = filePath + counter + ".txt";
+
+		    d3.csv(fileName, function(error, data) {
+				if (error) {
+					// console.log(error);
+					statusText.text(counter+" Data loaded ... Done! ");
+					return;
+				} else {
+					var line = new google.maps.Polyline({
+		                 path: [],
+		                 strokeColor: '#000',
+		                 strokeWeight: 3,
+		                 icons: [{
+		                     icon: lineSymbol,
+		                     offset: '0%'
+		                 }],
+		                 map: null
+		             });
+					for (var i = 0; i < data.length; i++) {
+						 line.getPath().push(new google.maps.LatLng(data[i].pt_lat,data[i].pt_lon));
+					};
+					lines.push(line);
+					counter++;
+					statusText.text("Data "+counter+" ... Done! ");
+					setTimeout("load_data("+counter+");",1);
+				}
+			});
+
+    }
+
+
+    function animateCircle(line) {
+        var animateCount = 0;
+        var animateId = setInterval(function() {
+        	try {
+	            if (isMotionPause == true) {return;}
+	            if (animateCount >= 199 && isDeleteable) {
+	            	clearInterval(animateId);
+	            	line.setMap(null);
+	            	animateCount=0;
+	            	return;
+	            }
+	           animateCount = (animateCount + 1) % 200;
+	           var icons = line.get('icons');
+	           icons[0].offset = (animateCount / 2) + '%';
+	           line.set('icons', icons);
+
+        	} catch(err) {
+        		logPathText.text("error!!");
+        		clearInterval(animateId);
+        		return;
+        	}
+            
+       }, MotionSpeed);
+		
+    }
+
+
+    function calcRoute(origins, destinations) {
+
+    	//local request ... when got errors will try request data from google.
+
+		try {
+
+				lines[count].setMap(map);
+				animateCircle(lines[count]);
+				count++;
+				return;
+
+		} catch(e) {
+
+		
+
+		// only load loacl caches.
+
+	    return;
+	    
+	    
+
+	    var line = new google.maps.Polyline({
+                 path: [],
+                 strokeColor: '#FF0000',
+                 strokeWeight: 3,
+                 icons: [{
+                     icon: lineSymbol,
+                     offset: '0%'
+                 }],
+                 map: map
+             });
+
+	    //google request ...
+
+		    var request = {
+		        origin: origins,
+		        destination: destinations,
+		        // provideRouteAlternatives: false,
+		        // Note that Javascript allows us to access the constant
+		        // using square brackets and a string value as its
+		        // "property."
+		        travelMode: google.maps.TravelMode.TRANSIT
+		        //travelMode: google.maps.TravelMode[selectedMode]
+		    };
+		    directionsService.route(request, function(response, status) {
+
+		    	//OVER_QUERY_LIMIT  ZERO_RESULTS
+		    	if (status == google.maps.DirectionsStatus.ZERO_RESULTS) {
+		    		logServerText
+		    			.attr("class","label label-danger")
+		    			.text("Google Map Server response: "+status+" wait a second...skip");
+		    		setTimeout('run_app();', 1000);
+		    		count++;
+		    		return;
+		    	}
+
+		    	// legs -> steps -> path -> 
+		        if (status == google.maps.DirectionsStatus.OK) {
+		        	// isPause = false;
+			        var legs = response.routes[0].legs;
+		            for (i=0;i<legs.length;i++) {
+		                var steps = legs[i].steps;
+		                for (j=0;j<steps.length;j++) {
+		                    var nextSegment = steps[j].path;
+		                    for (k=0;k<nextSegment.length;k++) {
+		                    	line.getPath().push(nextSegment[k]);
+		                    }
+		                }
+		            }
+		            lines.push(line);
+		            // directionsDisplay.setDirections(response);
+		            //-----------------------write to file----------------------------------//
+		            $.post( "data/log_data.php", 
+		            	{ filename: count, data: line.getPath().getArray().toString() }, 
+		            	function(data,status){
+	      				logPathText.text( "Status: " + status + " Data: " + data );
+	    			});
+
+		            animateCircle(lines[count]);
+
+		            count++;
+		            logServerText
+		    			.attr("class","label label-success")
+		    			.text("Google Map Server response: "+status);
+	        		addNewSpeed = 1000;
+	            } else {
+		    		addNewSpeed += 500;
+		    		logServerText
+		    			.attr("class","label label-danger")
+		    			.text("Google Map Server response: "+status+" wait a second... "+addNewSpeed+"ms");
+		    		
+	            }
+	        });
+		}
+	}
+
+	google.maps.event.addDomListener(window, 'load', initialize);
+	</script>
+
+
+</body>
+
+</html>
